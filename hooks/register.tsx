@@ -13,7 +13,7 @@ const usage = atom({ plugin: 'context-pilot', key: 'usage' } as const, null)
 const enabled = atom({ plugin: 'context-pilot', key: 'enabled' } as const, null)
 
 export const BAR = 20
-const METER = 10
+const METER = 5
 
 const MODES = [
   { id: 'default', label: '⏸ manual mode on' },

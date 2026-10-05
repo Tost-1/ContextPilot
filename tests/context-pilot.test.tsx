@@ -262,7 +262,7 @@ describe('context-pilot', () => {
     w.tokens = 186_000
     await start($)
     const ui = await $.ui.mount({ plugin: 'context-pilot', surface: 'desktop', component: 'SessionMode', props: { modes: ['focus'] } } as never)
-    expect(await ui.find({ type: 'Text', text: '━━━━━━' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '━━━' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: ' $2.07' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: ' 62%' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: ' 186k/300k' })).toBeDefined()
