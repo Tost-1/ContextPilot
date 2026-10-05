@@ -1,0 +1,13 @@
+{
+  "name": "context-pilot-mod",
+  "owner": {
+    "name": "Tost-1"
+  },
+  "plugins": [
+    {
+      "name": "context-pilot",
+      "source": "./",
+      "description": "Checkpoints, clears and resumes the session automatically once context reaches a target."
+    }
+  ]
+}
