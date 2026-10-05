@@ -47,6 +47,10 @@ export function gauge(u: Usage, limit: number | null) {
   return { percent, figures: `${short(u.tokens)} / ${limit ? `${short(limit)} target` : short(u.window)}` }
 }
 
+export function fill(percent: number, width: number) {
+  return Math.ceil((Math.min(Math.max(percent, 0), 100) / 100) * width)
+}
+
 export function dollars(usd: number) {
   return `$${usd.toFixed(2)}`
 }
@@ -474,7 +478,7 @@ export const register: Register = on => {
     if (!current) {
       const u = await read($, usage)
       const { percent, figures } = u ? gauge(u, await read($, target)) : { percent: 0, figures: '' }
-      const filled = Math.round((Math.min(percent, 100) / 100) * BAR)
+      const filled = fill(percent, BAR)
       const color = level(percent)
       const left = leaving(e.props.hint)
       if (left >= 0) track($, MODES[(left + 1) % MODES.length]!.id)
@@ -583,7 +587,7 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const limit = await read($, target)
     const { percent } = gauge(u, limit)
-    const filled = Math.round((Math.min(percent, 100) / 100) * 5)
+    const filled = fill(percent, 5)
     const color = level(percent)
 
     return (

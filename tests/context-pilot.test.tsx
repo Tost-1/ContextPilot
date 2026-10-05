@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { checkpointPrompt, parseTarget, respond, resumePrompt, short, step } from '../hooks/register'
+import { checkpointPrompt, fill, parseTarget, respond, resumePrompt, short, step } from '../hooks/register'
 
 const CWD = '/repo/AnyProject'
 const PATH = `${CWD}/.context-pilot/CHECKPOINT.md`
@@ -88,6 +88,7 @@ async function start($: Engine) {
 
 describe('context-pilot', () => {
   test('helpers', () => {
+    expect([fill(0, 5), fill(9, 5), fill(62, 5), fill(150, 5)]).toEqual([0, 1, 4, 5])
     expect(short(300_000)).toBe('300k')
     expect(parseTarget('300k')).toBe(300_000)
     expect(parseTarget('1.5m')).toBe(1_500_000)
@@ -260,7 +261,7 @@ describe('context-pilot', () => {
     w.tokens = 186_000
     await start($)
     const ui = await $.ui.mount({ plugin: 'context-pilot', surface: 'desktop', component: 'SessionMode', props: { modes: ['focus'] } } as never)
-    expect(await ui.find({ type: 'Text', text: '━━━' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '━━━━' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: ' $2.07' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: ' 62%' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: ' 186k/300k' })).toBeDefined()
