@@ -1,6 +1,6 @@
 {
   "name": "context-pilot",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "Checkpoints, clears and resumes the session automatically once context reaches a target.",
   "types": "./types/index.d.ts"
 }
