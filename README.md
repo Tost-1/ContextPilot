@@ -87,7 +87,7 @@ Changes save as you go. Close the picker with Space rather than Esc: while Claud
 | 75–89% | Yellow |
 | 90% and up | Red |
 
-In the terminal, the bar sits under the prompt. In the desktop app, a compact version appears in the footer. Both end with the session's total cost so far, the same figure `/usage` shows as Total cost:
+In the terminal, the bar sits under the prompt. In the desktop app, a compact version with a smooth bar appears in the footer. Both end with the session's total cost so far, the same figure `/usage` shows as Total cost:
 
 ```
 context ━━━━━━━━━━━━──────── 62% · 186k / 300k target · $2.07

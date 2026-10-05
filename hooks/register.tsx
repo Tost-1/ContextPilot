@@ -51,6 +51,14 @@ export function fill(percent: number, width: number) {
   return Math.ceil((Math.min(Math.max(percent, 0), 100) / 100) * width)
 }
 
+const METER = 72
+const SHADES = { success: '#4eba65', warning: '#e0a526', error: '#e5534b' }
+
+export function meter(percent: number) {
+  const width = fill(percent, METER)
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${METER}" height="4" viewBox="0 0 ${METER} 4"><rect width="${METER}" height="4" rx="2" fill="#888" fill-opacity="0.35"/><rect width="${width}" height="4" rx="2" fill="${SHADES[level(percent)]}"/></svg>`
+}
+
 export function dollars(usd: number) {
   return `$${usd.toFixed(2)}`
 }
@@ -584,16 +592,14 @@ export const register: Register = on => {
   on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
     const u = await read($, usage)
     if (e.surface === 'terminal' || !u) return next(e)
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
     const limit = await read($, target)
     const { percent } = gauge(u, limit)
-    const filled = fill(percent, 5)
     const color = level(percent)
 
     return (
-      <Box flexDirection="row">
-        <Text color={color}>{'━'.repeat(filled)}</Text>
-        <Text dimColor>{'─'.repeat(5 - filled)}</Text>
+      <Box flexDirection="row" alignItems="center">
+        <Svg source={meter(percent)} alt={`Context ${percent}% used`} width={METER} height={4} />
         <Text color={color}>{` ${percent}%`}</Text>
         <Text dimColor>{` ${short(u.tokens)}/${short(limit ?? u.window)}`}</Text>
         {u.usd !== undefined ? <Text dimColor>{` ${dollars(u.usd)}`}</Text> : null}
