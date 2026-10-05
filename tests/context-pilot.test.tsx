@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { checkpointPrompt, fill, halves, parseTarget, respond, resumePrompt, short, step } from '../hooks/register'
+import { checkpointPrompt, fill, parseTarget, respond, resumePrompt, short, step } from '../hooks/register'
 
 const CWD = '/repo/AnyProject'
 const PATH = `${CWD}/.context-pilot/CHECKPOINT.md`
@@ -88,8 +88,7 @@ async function start($: Engine) {
 
 describe('context-pilot', () => {
   test('helpers', () => {
-    expect([fill(0, 5), fill(9, 5), fill(62, 5), fill(150, 5)]).toEqual([0, 1, 4, 5])
-    expect([halves(0, 10), halves(2, 10), halves(9, 10), halves(62, 10), halves(150, 10)]).toEqual([0, 1, 2, 12, 20])
+    expect([fill(0, 8), fill(2, 8), fill(9, 8), fill(62, 8), fill(150, 8)]).toEqual([0, 1, 1, 5, 8])
     expect(short(300_000)).toBe('300k')
     expect(parseTarget('300k')).toBe(300_000)
     expect(parseTarget('1.5m')).toBe(1_500_000)

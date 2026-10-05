@@ -49,11 +49,7 @@ export function gauge(u: Usage, limit: number | null) {
 }
 
 export function fill(percent: number, width: number) {
-  return Math.ceil((Math.min(Math.max(percent, 0), 100) / 100) * width)
-}
-
-export function halves(percent: number, width: number) {
-  const exact = (Math.min(Math.max(percent, 0), 100) / 100) * width * 2
+  const exact = (Math.min(Math.max(percent, 0), 100) / 100) * width
   return exact > 0 ? Math.max(1, Math.round(exact)) : 0
 }
 
@@ -594,12 +590,14 @@ export const register: Register = on => {
     const limit = await read($, target)
     const { percent } = gauge(u, limit)
     const color = level(percent)
-    const lit = halves(percent, METER)
+    const lit = fill(percent, METER)
 
     return (
       <Box flexDirection="row">
-        <Text color={color}>{`${'━'.repeat(Math.floor(lit / 2))}${lit % 2 ? '╸' : ''}`}</Text>
-        <Text dimColor>{'─'.repeat(METER - Math.ceil(lit / 2))}</Text>
+        <Text>
+          <Text color={color}>{'━'.repeat(lit)}</Text>
+          <Text dimColor>{'─'.repeat(METER - lit)}</Text>
+        </Text>
         <Text color={color}>{` ${percent}%`}</Text>
         <Text dimColor>{` ${short(u.tokens)}/${short(limit ?? u.window)}`}</Text>
         {u.usd !== undefined ? <Text dimColor>{` ${dollars(u.usd)}`}</Text> : null}
