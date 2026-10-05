@@ -47,11 +47,15 @@ export function gauge(u: Usage, limit: number | null) {
   return { percent, figures: `${short(u.tokens)} / ${limit ? `${short(limit)} target` : short(u.window)}` }
 }
 
+export function dollars(usd: number) {
+  return `$${usd.toFixed(2)}`
+}
+
 async function refresh($: EngineInterface) {
-  const { context } = await $.session.usage()
+  const { context, cost } = await $.session.usage()
   const tokens = context.tokens ?? (await $.session.usage({ breakdown: 'summary' })).context.breakdown?.totalTokens
   const next: Usage | null =
-    tokens === undefined ? null : { percent: context.percent ?? Math.round((tokens / context.window) * 100), tokens, window: context.window }
+    tokens === undefined ? null : { percent: context.percent ?? Math.round((tokens / context.window) * 100), tokens, window: context.window, usd: cost?.usd }
   await update($, usage, () => next)
 }
 
@@ -490,6 +494,7 @@ export const register: Register = on => {
               <Text dimColor>{'─'.repeat(BAR - filled)}</Text>
               {u ? <Text color={color}>{` ${percent}%`}</Text> : null}
               {u ? <Text dimColor>{` · ${figures}`}</Text> : null}
+              {u?.usd !== undefined ? <Text dimColor>{` · ${dollars(u.usd)}`}</Text> : null}
             </Box>
           </Box>
         </Box>
@@ -587,6 +592,7 @@ export const register: Register = on => {
         <Text dimColor>{'─'.repeat(5 - filled)}</Text>
         <Text color={color}>{` ${percent}%`}</Text>
         <Text dimColor>{` ${short(u.tokens)}/${short(limit ?? u.window)}`}</Text>
+        {u.usd !== undefined ? <Text dimColor>{` ${dollars(u.usd)}`}</Text> : null}
       </Box>
     )
   })

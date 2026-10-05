@@ -2,7 +2,7 @@ export type Handoff = 'full' | 'lean'
 
 export type Settings = { isEnabled: boolean; target: number; handoff: Handoff }
 
-export type Usage = { percent: number; tokens: number; window: number }
+export type Usage = { percent: number; tokens: number; window: number; usd?: number }
 
 export type Menu = { draft: Settings; window: number }
 

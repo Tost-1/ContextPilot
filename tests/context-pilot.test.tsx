@@ -50,7 +50,7 @@ function world(on: On, settings: object) {
   })
   on('ui.focus', () => ({}))
   on('session.cwd', () => ({ value: CWD }) as never)
-  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1_000_000, tokens: w.tokens, percent: w.tokens === undefined ? undefined : Math.round(w.tokens / 10_000) }, rateLimits: [] } }) as never)
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1_000_000, tokens: w.tokens, percent: w.tokens === undefined ? undefined : Math.round(w.tokens / 10_000) }, rateLimits: [], cost: { usd: 2.0712 } } }) as never)
   on('command.register', (_$, e) => ({ value: { command: e.name } }) as never)
   on('command.run', (_$, e) => {
     w.commands.push(`/${e.command}${e.args ? ` ${e.args}` : ''}`)
@@ -247,6 +247,7 @@ describe('context-pilot', () => {
       const ui = await $.ui.mount({ plugin: 'context-pilot', surface: 'terminal', component: 'PromptHint', props: { isDraft: false, isWorking: false, hint: '? for shortcuts' } } as never)
       expect(await ui.find({ type: 'Text', text: percent })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: figures })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: ' · $2.07' })).toBeDefined()
     })
   }
 
@@ -260,6 +261,7 @@ describe('context-pilot', () => {
     await start($)
     const ui = await $.ui.mount({ plugin: 'context-pilot', surface: 'desktop', component: 'SessionMode', props: { modes: ['focus'] } } as never)
     expect(await ui.find({ type: 'Text', text: '━━━' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: ' $2.07' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: ' 62%' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: ' 186k/300k' })).toBeDefined()
   })
