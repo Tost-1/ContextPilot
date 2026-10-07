@@ -113,14 +113,18 @@ export function meters(u: Usage | null, a: Account | null): Meter[] {
 
 let seed: number | undefined
 
+async function count($: EngineInterface, breakdown: 'summary' | 'full') {
+  return (await $.session.usage({ breakdown })).context.breakdown?.totalTokens
+}
+
 async function refresh($: EngineInterface) {
   const { context, cost, rateLimits } = await $.session.usage()
-  const tokens = context.tokens ?? seed ?? (await $.session.usage({ breakdown: 'full' })).context.breakdown?.totalTokens
+  const tokens = context.tokens === undefined ? (seed ?? (await count($, 'full'))) : ((await count($, 'summary')) ?? context.tokens)
   const windowOf = (kind: string) => (rateLimits ?? []).find(r => r.kind === kind)?.percentUsed
   const next: Usage | null =
     tokens === undefined
       ? null
-      : { percent: context.percent ?? Math.round((tokens / context.window) * 100), tokens, window: context.window, usd: cost?.usd, fiveHour: windowOf('five_hour'), week: windowOf('seven_day') }
+      : { percent: Math.round((tokens / context.window) * 100), tokens, window: context.window, usd: cost?.usd, fiveHour: windowOf('five_hour'), week: windowOf('seven_day') }
   await update($, usage, () => next)
 }
 
