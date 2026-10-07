@@ -93,6 +93,15 @@ In the terminal, the bar sits under the prompt. In the desktop app, a compact ve
 context ━━━━━━━━━━━━──────── 62% · 186k / 300k target · $2.07
 ```
 
+After the cost, the bar shows how much of your account's limits you've used. It shows only the one that applies to your account:
+
+| Account | Shows |
+|---|---|
+| Subscription (Pro, Max) | `· 5h 34% · week 61%`: the 5-hour and weekly limits |
+| Usage credits with a monthly spend limit | `· month $412 / $1,500`: spend so far this month |
+
+The 5-hour and weekly figures come from Claude Code's own rate-limit readings. The monthly spend comes from the same endpoint `/usage` reads. It's fetched when the session starts, then at most every 5 minutes. If `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` is set, the spend can't be fetched, so it doesn't appear. In the desktop footer, the limits replace the token figures and cost to fit the space.
+
 ## Choosing a target
 
 The check runs between turns, so one long turn can go past the target before the cycle starts. Leave room below the model's window for one big turn plus the checkpoint turn. For example, 300k on a 1M-context model, or about 150k on a 200k model.

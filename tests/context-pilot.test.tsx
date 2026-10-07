@@ -2,13 +2,13 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { checkpointPrompt, fill, parseTarget, respond, resumePrompt, short, step } from '../hooks/register'
+import { accountOf, checkpointPrompt, fill, meters, money, parseTarget, respond, resumePrompt, short, step } from '../hooks/register'
 
 const CWD = '/repo/AnyProject'
 const PATH = `${CWD}/.context-pilot/CHECKPOINT.md`
 const DOCS = `${CWD}/docs/CHECKPOINT.md`
 
-type World = { tokens: number | undefined; commands: string[]; prompts: string[]; content: string | null; skipWrite: boolean; files: string[]; written: string[] }
+type World = { tokens: number | undefined; commands: string[]; prompts: string[]; content: string | null; skipWrite: boolean; files: string[]; written: string[]; rateLimits: object[]; report: object | null }
 
 function markOf(text: string) {
   return text.match(/<!-- context-pilot (\S+) -->/)![1]!
@@ -23,7 +23,7 @@ let pending: string | null = null
 let turns = 0
 
 function world(on: On, settings: object) {
-  const w: World = { tokens: undefined, commands: [], prompts: [], content: null, skipWrite: false, files: [], written: [] }
+  const w: World = { tokens: undefined, commands: [], prompts: [], content: null, skipWrite: false, files: [], written: [], rateLimits: [], report: null }
   const clock = mock.clock(on, { now: 1_000 })
   mock.store(on, { settings })
   enableOnStart = (settings as { isEnabled?: boolean }).isEnabled === true
@@ -50,7 +50,9 @@ function world(on: On, settings: object) {
   })
   on('ui.focus', () => ({}))
   on('session.cwd', () => ({ value: CWD }) as never)
-  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1_000_000, tokens: w.tokens, percent: w.tokens === undefined ? undefined : Math.round(w.tokens / 10_000) }, rateLimits: [], cost: { usd: 2.0712 } } }) as never)
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1_000_000, tokens: w.tokens, percent: w.tokens === undefined ? undefined : Math.round(w.tokens / 10_000) }, rateLimits: w.rateLimits, cost: { usd: 2.0712 } } }) as never)
+  on('session.authorize', () => ({ value: { handle: 'h', kind: 'bearer' } }) as never)
+  on('http.fetch', () => ({ value: w.report ? { status: 200, ok: true, headers: {}, text: JSON.stringify(w.report) } : { status: 500, ok: false, headers: {}, text: '' } }) as never)
   on('command.register', (_$, e) => ({ value: { command: e.name } }) as never)
   on('command.run', (_$, e) => {
     w.commands.push(`/${e.command}${e.args ? ` ${e.args}` : ''}`)
@@ -251,6 +253,55 @@ describe('context-pilot', () => {
       expect(await ui.find({ type: 'Text', text: ' · $2.07' })).toBeDefined()
     })
   }
+
+  test('limits and monthly spend', () => {
+    expect(money(1500)).toBe('$1,500')
+    expect(money(412.4)).toBe('$412')
+    const minor = (amount_minor: number) => ({ amount_minor, currency: 'USD', exponent: 2 })
+    expect(accountOf({ spend: { used: minor(41_237), limit: minor(150_000) } }).spend).toEqual({ used: 412.37, limit: 1500 })
+    expect(accountOf({ extra_usage: { is_enabled: true, monthly_limit: 150_000, used_credits: 41_237 } }).spend).toEqual({ used: 412.37, limit: 1500 })
+    expect(accountOf({ wattle_ember: { limit_dollars: 1500, used_dollars: 412.37 } }).spend).toEqual({ used: 412.37, limit: 1500 })
+    expect(accountOf({ spend: { used: minor(0), limit: null }, extra_usage: { is_enabled: false, monthly_limit: null, used_credits: null } }).spend).toBe(undefined)
+    const usage = { percent: 10, tokens: 1, window: 10 }
+    const spend = { used: 412.37, limit: 1500 }
+    expect(meters({ ...usage, fiveHour: 34, week: 61 }, { spend }).map(m => m.compact)).toEqual(['5h 34%', 'wk 61%'])
+    expect(meters(usage, { fiveHour: 0, week: 0, spend }).map(m => m.text)).toEqual(['$412 / $1,500'])
+    expect(meters(usage, { fiveHour: 5 }).map(m => m.text)).toEqual(['5%', '0%'])
+    expect(meters({ ...usage, week: 49 }, { fiveHour: 2, week: 50 }).map(m => m.compact)).toEqual(['5h 2%', 'wk 49%'])
+    expect(meters({ ...usage, week: 49 }, null).map(m => m.compact)).toEqual(['5h 0%', 'wk 49%'])
+    expect(meters(usage, { spend }).map(m => [m.text, m.compact])).toEqual([['$412 / $1,500', '$412/$1.5k']])
+    expect(meters(usage, null)).toEqual([])
+  })
+
+  test('bar shows the 5-hour and weekly limits on a subscription', async ($, on) => {
+    const { w, clock } = world(on, { isEnabled: false, target: 300_000 })
+    w.tokens = 186_000
+    w.rateLimits = [{ kind: 'five_hour', percentUsed: 34 }, { kind: 'seven_day', percentUsed: 91.5 }]
+    w.report = { spend: { used: { amount_minor: 41_237, exponent: 2 }, limit: { amount_minor: 150_000, exponent: 2 } } }
+    await start($)
+    await clock.settle()
+    const ui = await $.ui.mount({ plugin: 'context-pilot', surface: 'terminal', component: 'PromptHint', props: { isDraft: false, isWorking: false, hint: '? for shortcuts' } } as never)
+    expect(await ui.find({ type: 'Text', text: ' · 5h ' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '34%' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: ' · week ' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '92%' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: ' · month ' })).toBeUndefined()
+  })
+
+  test('bar shows monthly spend where there are no limits', async ($, on) => {
+    const { w, clock } = world(on, { isEnabled: false, target: 300_000 })
+    w.tokens = 186_000
+    w.report = { five_hour: null, seven_day: null, spend: { used: { amount_minor: 41_237, exponent: 2 }, limit: { amount_minor: 150_000, exponent: 2 } } }
+    await start($)
+    await clock.settle()
+    const ui = await $.ui.mount({ plugin: 'context-pilot', surface: 'terminal', component: 'PromptHint', props: { isDraft: false, isWorking: false, hint: '? for shortcuts' } } as never)
+    expect(await ui.find({ type: 'Text', text: ' · $2.07' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: ' · month ' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '$412 / $1,500' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: ' · 5h ' })).toBeUndefined()
+    const desk = await $.ui.mount({ plugin: 'context-pilot', surface: 'desktop', component: 'SessionMode', props: { modes: ['focus'] } } as never)
+    expect(await desk.find({ type: 'Text', text: ' $412/$1.5k' })).toBeDefined()
+  })
 
   test('desktop shows context beside the footer modes', async ($, on) => {
     const { w } = world(on, { isEnabled: true, target: 300_000 })

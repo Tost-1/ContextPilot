@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, TurnCompleteInput } from 'claude-code'
 
-import type { Handoff, Settings, Usage } from '../types'
+import type { Account, Handoff, Settings, Spend, Usage } from '../types'
 
 const CELL = 6
 const STOPS = [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900].map(k => k * 1000)
@@ -11,6 +11,10 @@ const target = atom({ plugin: 'context-pilot', key: 'target' } as const, null)
 const current = atom({ plugin: 'context-pilot', key: 'live' } as const, null)
 const usage = atom({ plugin: 'context-pilot', key: 'usage' } as const, null)
 const enabled = atom({ plugin: 'context-pilot', key: 'enabled' } as const, null)
+const account = atom({ plugin: 'context-pilot', key: 'account' } as const, null)
+
+const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
+const POLL = 5 * 60_000
 
 export const BAR = 20
 const METER = 5
@@ -57,12 +61,77 @@ export function dollars(usd: number) {
   return `$${usd.toFixed(2)}`
 }
 
+export function money(usd: number) {
+  return `$${Math.round(usd).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
+}
+
+type Minor = { amount_minor: number; exponent: number } | null
+type Report = {
+  five_hour?: { utilization: number | null } | null
+  seven_day?: { utilization: number | null } | null
+  spend?: { used?: Minor; limit?: Minor } | null
+  extra_usage?: { is_enabled: boolean; monthly_limit: number | null; used_credits: number | null; decimal_places?: number | null } | null
+  wattle_ember?: { limit_dollars?: number | null; used_dollars?: number | null } | null
+}
+
+function minor(m: Minor | undefined) {
+  return m ? m.amount_minor / 10 ** m.exponent : undefined
+}
+
+function spendOf(r: Report): Spend | undefined {
+  const used = minor(r.spend?.used)
+  const limit = minor(r.spend?.limit)
+  if (used !== undefined && limit) return { used, limit }
+  const extra = r.extra_usage
+  if (extra?.is_enabled && extra.monthly_limit && extra.used_credits !== null) {
+    const scale = 10 ** (extra.decimal_places ?? 2)
+    return { used: extra.used_credits / scale, limit: extra.monthly_limit / scale }
+  }
+  const credit = r.wattle_ember
+  if (credit?.limit_dollars && typeof credit.used_dollars === 'number') return { used: credit.used_dollars, limit: credit.limit_dollars }
+  return undefined
+}
+
+export function accountOf(r: Report): Account {
+  return { fiveHour: r.five_hour?.utilization ?? undefined, week: r.seven_day?.utilization ?? undefined, spend: spendOf(r) }
+}
+
+export type Meter = { label: string; text: string; compact: string; percent: number }
+
+function windows(fiveHour: number | undefined, week: number | undefined): Meter[] {
+  if (fiveHour === undefined && week === undefined) return []
+  const meter = (label: string, tag: string, percent = 0) => ({ label, text: `${Math.round(percent)}%`, compact: `${tag} ${Math.round(percent)}%`, percent })
+  return [meter('5h', '5h', fiveHour), meter('week', 'wk', week)]
+}
+
+export function meters(u: Usage | null, a: Account | null): Meter[] {
+  if (u?.fiveHour !== undefined || u?.week !== undefined) return windows(u.fiveHour ?? a?.fiveHour, u.week ?? a?.week)
+  const s = a?.spend
+  if (s) return [{ label: 'month', text: `${money(s.used)} / ${money(s.limit)}`, compact: `$${short(Math.round(s.used))}/$${short(s.limit)}`, percent: (s.used / s.limit) * 100 }]
+  return windows(a?.fiveHour, a?.week)
+}
+
 async function refresh($: EngineInterface) {
-  const { context, cost } = await $.session.usage()
+  const { context, cost, rateLimits } = await $.session.usage()
   const tokens = context.tokens ?? (await $.session.usage({ breakdown: 'summary' })).context.breakdown?.totalTokens
+  const windowOf = (kind: string) => (rateLimits ?? []).find(r => r.kind === kind)?.percentUsed
   const next: Usage | null =
-    tokens === undefined ? null : { percent: context.percent ?? Math.round((tokens / context.window) * 100), tokens, window: context.window, usd: cost?.usd }
+    tokens === undefined
+      ? null
+      : { percent: context.percent ?? Math.round((tokens / context.window) * 100), tokens, window: context.window, usd: cost?.usd, fiveHour: windowOf('five_hour'), week: windowOf('seven_day') }
   await update($, usage, () => next)
+}
+
+let polledAt = -Infinity
+
+async function poll($: EngineInterface) {
+  const now = await $.clock.now()
+  if (now - polledAt < POLL) return
+  polledAt = now
+  const auth = await $.session.authorize()
+  if (!auth) return
+  const res = await $.http.fetch(USAGE_URL, { auth: auth.handle })
+  if (res.ok) await update($, account, () => accountOf(JSON.parse(res.text) as Report))
 }
 
 let mode: string | null = null
@@ -402,6 +471,7 @@ export const register: Register = on => {
     const result = await next(e)
     if (!mode) track($, await initialMode($))
     await refresh($)
+    poll($).catch(() => undefined)
     return result
   })
 
@@ -420,6 +490,8 @@ export const register: Register = on => {
       })
     }
     await refresh($).catch(() => undefined)
+    const u = await read($, usage)
+    if (!e.agentId && (u?.fiveHour === undefined || u?.week === undefined)) poll($).catch(() => undefined)
     return result
   })
 
@@ -479,6 +551,7 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     if (!current) {
       const u = await read($, usage)
+      const limits = meters(u, await read($, account))
       const { percent, figures } = u ? gauge(u, await read($, target)) : { percent: 0, figures: '' }
       const filled = fill(percent, BAR)
       const color = level(percent)
@@ -501,6 +574,12 @@ export const register: Register = on => {
               {u ? <Text color={color}>{` ${percent}%`}</Text> : null}
               {u ? <Text dimColor>{` · ${figures}`}</Text> : null}
               {u?.usd !== undefined ? <Text dimColor>{` · ${dollars(u.usd)}`}</Text> : null}
+              {limits.map(m => (
+                <Text>
+                  <Text dimColor>{` · ${m.label} `}</Text>
+                  <Text color={level(m.percent)}>{m.text}</Text>
+                </Text>
+              ))}
             </Box>
           </Box>
         </Box>
@@ -591,6 +670,7 @@ export const register: Register = on => {
     const { percent } = gauge(u, limit)
     const color = level(percent)
     const lit = fill(percent, METER)
+    const limits = meters(u, await read($, account))
 
     return (
       <Box flexDirection="row">
@@ -599,8 +679,8 @@ export const register: Register = on => {
           <Text dimColor>{'─'.repeat(METER - lit)}</Text>
         </Text>
         <Text color={color}>{` ${percent}%`}</Text>
-        <Text dimColor>{` ${short(u.tokens)}/${short(limit ?? u.window)}`}</Text>
-        {u.usd !== undefined ? <Text dimColor>{` ${dollars(u.usd)}`}</Text> : null}
+        {limits.length > 0 ? <Text dimColor>{` ${limits.map(m => m.compact).join(' ')}`}</Text> : <Text dimColor>{` ${short(u.tokens)}/${short(limit ?? u.window)}`}</Text>}
+        {limits.length === 0 && u.usd !== undefined ? <Text dimColor>{` ${dollars(u.usd)}`}</Text> : null}
       </Box>
     )
   })
