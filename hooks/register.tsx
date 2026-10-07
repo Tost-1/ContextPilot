@@ -107,7 +107,10 @@ function windows(fiveHour: number | undefined, week: number | undefined): Meter[
 export function meters(u: Usage | null, a: Account | null): Meter[] {
   if (u?.fiveHour !== undefined || u?.week !== undefined) return windows(u.fiveHour ?? a?.fiveHour, u.week ?? a?.week)
   const s = a?.spend
-  if (s) return [{ label: 'month', text: `${money(s.used)} / ${money(s.limit)}`, compact: `$${short(Math.round(s.used))}/$${short(s.limit)}`, percent: (s.used / s.limit) * 100 }]
+  if (s) {
+    const percent = (s.used / s.limit) * 100
+    return [{ label: 'month', text: `${Math.round(percent)}% (${money(s.used)} / ${money(s.limit)})`, compact: `$${short(Math.round(s.used))}/$${short(s.limit)}`, percent }]
+  }
   return windows(a?.fiveHour, a?.week)
 }
 

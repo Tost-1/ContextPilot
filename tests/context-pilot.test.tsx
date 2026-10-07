@@ -265,11 +265,11 @@ describe('context-pilot', () => {
     const usage = { percent: 10, tokens: 1, window: 10 }
     const spend = { used: 412.37, limit: 1500 }
     expect(meters({ ...usage, fiveHour: 34, week: 61 }, { spend }).map(m => m.compact)).toEqual(['5h 34%', 'wk 61%'])
-    expect(meters(usage, { fiveHour: 0, week: 0, spend }).map(m => m.text)).toEqual(['$412 / $1,500'])
+    expect(meters(usage, { fiveHour: 0, week: 0, spend }).map(m => m.text)).toEqual(['27% ($412 / $1,500)'])
     expect(meters(usage, { fiveHour: 5 }).map(m => m.text)).toEqual(['5%', '0%'])
     expect(meters({ ...usage, week: 49 }, { fiveHour: 2, week: 50 }).map(m => m.compact)).toEqual(['5h 2%', 'wk 49%'])
     expect(meters({ ...usage, week: 49 }, null).map(m => m.compact)).toEqual(['5h 0%', 'wk 49%'])
-    expect(meters(usage, { spend }).map(m => [m.text, m.compact])).toEqual([['$412 / $1,500', '$412/$1.5k']])
+    expect(meters(usage, { spend }).map(m => [m.text, m.compact])).toEqual([['27% ($412 / $1,500)', '$412/$1.5k']])
     expect(meters(usage, null)).toEqual([])
   })
 
@@ -297,7 +297,7 @@ describe('context-pilot', () => {
     const ui = await $.ui.mount({ plugin: 'context-pilot', surface: 'terminal', component: 'PromptHint', props: { isDraft: false, isWorking: false, hint: '? for shortcuts' } } as never)
     expect(await ui.find({ type: 'Text', text: ' · $2.07' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: ' · month ' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '$412 / $1,500' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '27% ($412 / $1,500)' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: ' · 5h ' })).toBeUndefined()
     const desk = await $.ui.mount({ plugin: 'context-pilot', surface: 'desktop', component: 'SessionMode', props: { modes: ['focus'] } } as never)
     expect(await desk.find({ type: 'Text', text: ' $412/$1.5k' })).toBeDefined()

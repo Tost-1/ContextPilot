@@ -98,7 +98,7 @@ After the cost, the bar shows how much of your account's limits you've used. It 
 | Account | Shows |
 |---|---|
 | Subscription (Pro, Max) | `· 5h 34% · week 61%`: the 5-hour and weekly limits |
-| Usage credits with a monthly spend limit | `· month $412 / $1,500`: spend so far this month |
+| Usage credits with a monthly spend limit | `· month 27% ($412 / $1,500)`: spend so far this month, as a share of the limit |
 
 The 5-hour and weekly figures come from Claude Code's own rate-limit readings. The monthly spend comes from the same endpoint `/usage` reads. It's fetched when the session starts, then at most every 5 minutes. If `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` is set, the spend can't be fetched, so it doesn't appear. In the desktop footer, the limits replace the token figures and cost to fit the space.
 
