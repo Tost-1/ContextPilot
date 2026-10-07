@@ -128,6 +128,10 @@ async function refresh($: EngineInterface) {
   await update($, usage, () => next)
 }
 
+function settle($: EngineInterface) {
+  for (const ms of [500, 2_000, 5_000]) $.clock.after(ms, () => refresh($).catch(() => undefined))
+}
+
 let polledAt = -Infinity
 
 async function poll($: EngineInterface) {
@@ -474,6 +478,7 @@ export const register: Register = on => {
     if (e.source === 'resume' || e.source === 'fork' || e.source === 'clear') {
       await publish($, await load($))
       await refresh($).catch(() => undefined)
+      settle($)
     }
     return result
   })
@@ -487,6 +492,7 @@ export const register: Register = on => {
     const result = await next(e)
     if (!mode) track($, await initialMode($))
     await refresh($).catch(() => undefined)
+    settle($)
     poll($).catch(() => undefined)
     return result
   })

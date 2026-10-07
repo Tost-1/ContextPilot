@@ -326,6 +326,18 @@ describe('context-pilot', () => {
     expect(await ui.find({ type: 'Text', text: ' · 186k / 300k target' })).toBeUndefined()
   })
 
+  test('bar catches up once a resumed conversation has loaded', async ($, on) => {
+    const { w, clock } = world(on, { isEnabled: true, target: 300_000 })
+    on('classic.SessionStart', () => ({}) as never)
+    await start($)
+    await $.classic.SessionStart({ source: 'resume' } as never)
+    const ui = await $.ui.mount({ plugin: 'context-pilot', surface: 'terminal', component: 'PromptHint', props: { isDraft: false, isWorking: false, hint: '? for shortcuts' } } as never)
+    expect(await ui.find({ type: 'Text', text: ' · 166k / 300k target' })).toBeUndefined()
+    w.tokens = 166_000
+    await clock.advance(500)
+    expect(await ui.find({ type: 'Text', text: ' · 166k / 300k target' })).toBeDefined()
+  })
+
   test('desktop shows context beside the footer modes', async ($, on) => {
     const { w } = world(on, { isEnabled: true, target: 300_000 })
     on('ui.render', { component: 'SessionMode' }, ($, e) => {
