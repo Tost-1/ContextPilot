@@ -303,6 +303,18 @@ describe('context-pilot', () => {
     expect(await desk.find({ type: 'Text', text: ' $412/$1.5k' })).toBeDefined()
   })
 
+  for (const source of ['resume', 'clear'] as const) {
+    test(`bar keeps the target after a ${source}`, async ($, on) => {
+      const { w } = world(on, { isEnabled: true, target: 300_000 })
+      on('classic.SessionStart', () => ({}) as never)
+      w.tokens = 186_000
+      await start($)
+      await $.classic.SessionStart({ source } as never)
+      const ui = await $.ui.mount({ plugin: 'context-pilot', surface: 'terminal', component: 'PromptHint', props: { isDraft: false, isWorking: false, hint: '? for shortcuts' } } as never)
+      expect(await ui.find({ type: 'Text', text: ' · 186k / 300k target' })).toBeDefined()
+    })
+  }
+
   test('desktop shows context beside the footer modes', async ($, on) => {
     const { w } = world(on, { isEnabled: true, target: 300_000 })
     on('ui.render', { component: 'SessionMode' }, ($, e) => {

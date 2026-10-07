@@ -462,6 +462,15 @@ export const register: Register = on => {
     return next(e)
   })
 
+  on('classic.SessionStart', async ($, e, next) => {
+    const result = await next(e)
+    if (e.source === 'resume' || e.source === 'clear') {
+      await publish($, await load($))
+      await refresh($).catch(() => undefined)
+    }
+    return result
+  })
+
   on('session.start', async ($, e, next) => {
     pilot.isEnabled = (await read($, enabled)) ?? false
     pilot.surface = e.surface
