@@ -111,9 +111,11 @@ export function meters(u: Usage | null, a: Account | null): Meter[] {
   return windows(a?.fiveHour, a?.week)
 }
 
+let seed: number | undefined
+
 async function refresh($: EngineInterface) {
   const { context, cost, rateLimits } = await $.session.usage()
-  const tokens = context.tokens ?? (await $.session.usage({ breakdown: 'summary' })).context.breakdown?.totalTokens
+  const tokens = context.tokens ?? seed ?? (await $.session.usage({ breakdown: 'full' })).context.breakdown?.totalTokens
   const windowOf = (kind: string) => (rateLimits ?? []).find(r => r.kind === kind)?.percentUsed
   const next: Usage | null =
     tokens === undefined
@@ -464,7 +466,8 @@ export const register: Register = on => {
 
   on('classic.SessionStart', async ($, e, next) => {
     const result = await next(e)
-    if (e.source === 'resume' || e.source === 'clear') {
+    seed = e.source === 'resume' || e.source === 'fork' ? e.context_tokens : undefined
+    if (e.source === 'resume' || e.source === 'fork' || e.source === 'clear') {
       await publish($, await load($))
       await refresh($).catch(() => undefined)
     }
@@ -479,7 +482,7 @@ export const register: Register = on => {
     await publish($, await load($))
     const result = await next(e)
     if (!mode) track($, await initialMode($))
-    await refresh($)
+    await refresh($).catch(() => undefined)
     poll($).catch(() => undefined)
     return result
   })

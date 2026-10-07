@@ -315,6 +315,17 @@ describe('context-pilot', () => {
     })
   }
 
+  test('bar shows the resumed transcript before the first reply', async ($, on) => {
+    world(on, { isEnabled: true, target: 300_000 })
+    on('classic.SessionStart', () => ({}) as never)
+    await start($)
+    await $.classic.SessionStart({ source: 'resume', context_tokens: 186_000 } as never)
+    const ui = await $.ui.mount({ plugin: 'context-pilot', surface: 'terminal', component: 'PromptHint', props: { isDraft: false, isWorking: false, hint: '? for shortcuts' } } as never)
+    expect(await ui.find({ type: 'Text', text: ' · 186k / 300k target' })).toBeDefined()
+    await $.classic.SessionStart({ source: 'clear' } as never)
+    expect(await ui.find({ type: 'Text', text: ' · 186k / 300k target' })).toBeUndefined()
+  })
+
   test('desktop shows context beside the footer modes', async ($, on) => {
     const { w } = world(on, { isEnabled: true, target: 300_000 })
     on('ui.render', { component: 'SessionMode' }, ($, e) => {
