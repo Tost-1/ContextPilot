@@ -128,8 +128,14 @@ async function refresh($: EngineInterface) {
   await update($, usage, () => next)
 }
 
+async function restore($: EngineInterface) {
+  await publish($, await load($))
+  await update($, account, () => report)
+  await refresh($).catch(() => undefined)
+}
+
 function settle($: EngineInterface) {
-  for (const ms of [500, 2_000, 5_000]) $.clock.after(ms, () => refresh($).catch(() => undefined))
+  for (const ms of [500, 2_000, 5_000]) $.clock.after(ms, () => restore($).catch(() => undefined))
 }
 
 let polledAt = -Infinity
@@ -479,12 +485,16 @@ export const register: Register = on => {
     const result = await next(e)
     seed = e.source === 'resume' || e.source === 'fork' ? e.context_tokens : undefined
     if (e.source === 'resume' || e.source === 'fork' || e.source === 'clear') {
-      await publish($, await load($))
-      await update($, account, () => report)
-      await refresh($).catch(() => undefined)
+      await restore($)
       settle($)
     }
     return result
+  })
+
+  on('session.end', async ($, e, next) => {
+    seed = undefined
+    if (e.reason === 'resume' || e.reason === 'clear') settle($)
+    return next(e)
   })
 
   on('session.start', async ($, e, next) => {
