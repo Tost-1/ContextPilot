@@ -133,6 +133,7 @@ function settle($: EngineInterface) {
 }
 
 let polledAt = -Infinity
+let report: Account | null = null
 
 async function poll($: EngineInterface) {
   const now = await $.clock.now()
@@ -141,7 +142,9 @@ async function poll($: EngineInterface) {
   const auth = await $.session.authorize()
   if (!auth) return
   const res = await $.http.fetch(USAGE_URL, { auth: auth.handle })
-  if (res.ok) await update($, account, () => accountOf(JSON.parse(res.text) as Report))
+  if (!res.ok) return
+  report = accountOf(JSON.parse(res.text) as Report)
+  await update($, account, () => report)
 }
 
 let mode: string | null = null
@@ -477,6 +480,7 @@ export const register: Register = on => {
     seed = e.source === 'resume' || e.source === 'fork' ? e.context_tokens : undefined
     if (e.source === 'resume' || e.source === 'fork' || e.source === 'clear') {
       await publish($, await load($))
+      await update($, account, () => report)
       await refresh($).catch(() => undefined)
       settle($)
     }
